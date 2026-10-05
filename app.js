@@ -75,16 +75,30 @@ function status(msg, ms = 2200) {
 /* ---------------- ink canvas ---------------- */
 const canvas = $('#ink');
 const ctx = canvas.getContext('2d');
-let W = 0, H = 0;
+let W = 0, H = 0, SH = 0; // canvas width/height, and the height of one sheet
+const MAX_LEN = 8;          // a page can grow to 8 sheets long
+const pageLen = (n = cur()) => (n && n.len) || 1;
 
-function resizeCanvas() {
-  const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-  W = r.width; H = r.height;
+// The page is one sheet wide and `len` sheets tall; the book scrolls vertically when it's longer than the screen.
+function layoutPage() {
+  const book = $('#book'), page = $('#page');
+  const bw = book.clientWidth, bh = book.clientHeight;
+  if (!bw || !bh) return;
+  SH = Math.floor(Math.min(bh, bw * 1.414));
+  W = Math.floor(SH / 1.414); H = SH * pageLen();
+  page.style.width = W + 'px'; page.style.height = H + 'px';
+  page.style.setProperty('--sheet-h', SH + 'px');
+  const dpr = Math.min(2, window.devicePixelRatio || 1); // capped so long pages stay within canvas limits
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  redraw();
+  redraw(); // stickies are positioned in sheet units by CSS, so they follow without re-rendering
 }
-// Points are stored normalised (0..1) so a page looks the same on the phone and on a desktop browser.
+function growPage(n = cur()) {
+  if (pageLen(n) >= MAX_LEN) return false;
+  n.len = pageLen(n) + 1; touch(n); layoutPage(); return true;
+}
+// Points are stored as x: 0..1 of the page width, y: in sheets from the top (0..len),
+// so a page looks the same on the phone and on a desktop browser.
 function segWidth(s, p) {
   const base = s.w * W / 700;
   return s.tool === 'highlighter' ? base * 4 : base * (0.35 + 1.1 * p);
@@ -95,7 +109,7 @@ function drawSegment(s, a, b) {
   ctx.strokeStyle = s.color;
   if (s.tool === 'highlighter') { ctx.globalAlpha = 0.28; ctx.globalCompositeOperation = 'multiply'; }
   ctx.lineWidth = segWidth(s, (a[2] + b[2]) / 2);
-  ctx.beginPath(); ctx.moveTo(a[0] * W, a[1] * H); ctx.lineTo(b[0] * W, b[1] * H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(a[0] * W, a[1] * SH); ctx.lineTo(b[0] * W, b[1] * SH); ctx.stroke();
   ctx.restore();
 }
 function drawStroke(s) {
@@ -104,8 +118,8 @@ function drawStroke(s) {
   if (s.tool === 'highlighter') { // one path so overlapping segments don't darken
     ctx.save(); ctx.globalAlpha = 0.28; ctx.globalCompositeOperation = 'multiply';
     ctx.strokeStyle = s.color; ctx.lineWidth = segWidth(s, 0.5); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath(); ctx.moveTo(p[0][0] * W, p[0][1] * H);
-    for (const q of p) ctx.lineTo(q[0] * W, q[1] * H);
+    ctx.beginPath(); ctx.moveTo(p[0][0] * W, p[0][1] * SH);
+    for (const q of p) ctx.lineTo(q[0] * W, q[1] * SH);
     ctx.stroke(); ctx.restore(); return;
   }
   for (let i = 1; i < p.length; i++) drawSegment(s, p[i - 1], p[i]);
@@ -119,7 +133,7 @@ function redraw() {
 
 /* Pointer handling: pen and mouse write; a finger swipes pages (palm rejection for free). */
 let live = null, erasing = false, swipe = null, sawPen = false;
-const norm = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.pointerType === 'mouse' ? 0.5 : (e.pressure || 0.5)]; };
+const norm = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / SH, e.pointerType === 'mouse' ? 0.5 : (e.pressure || 0.5)]; };
 
 function eraseAt(pt) {
   const n = cur(), rad = 0.018, before = n.strokes.length;
@@ -157,7 +171,12 @@ canvas.addEventListener('pointermove', (e) => {
   if (live.tool === 'highlighter') { redraw(); drawStroke(live); }
 });
 const endStroke = () => {
-  if (live) { cur().strokes.push(live); live = null; redraw(); touch(); }
+  if (live) {
+    const n = cur(); n.strokes.push(live);
+    const low = Math.max(...live.pts.map((q) => q[1]));
+    live = null; redraw(); touch();
+    if (low > pageLen(n) - 0.25) growPage(n); // writing near the bottom adds another sheet
+  }
   erasing = false;
 };
 canvas.addEventListener('pointerup', (e) => {
@@ -177,7 +196,7 @@ function renderPage() {
   $('#noteCat').style.color = n && n.category ? catColor(n.category) : '';
   $('#pageNo').textContent = S.view.length ? `${S.idx + 1} / ${S.view.length}` : '';
   renderStickies();
-  redraw();
+  layoutPage();
 }
 
 /* Page turning: a snapshot of the page (the "leaf") rotates around the spine on the left,
@@ -198,7 +217,7 @@ function makeLeaf(dir) {
   const page = $('#page'), r = page.getBoundingClientRect(), b = book.getBoundingClientRect();
   const leaf = document.createElement('div');
   leaf.className = 'leaf';
-  Object.assign(leaf.style, { left: r.left - b.left + 'px', top: r.top - b.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  Object.assign(leaf.style, { left: r.left - b.left + 'px', top: r.top - b.top + book.scrollTop + 'px', width: r.width + 'px', height: r.height + 'px' });
   leaf.innerHTML = '<div class="face front"><div class="shade"></div></div><div class="face back"><div class="shade"></div></div>';
   leaf.firstChild.prepend(snapshotPage());
   const ghost = document.createElement('canvas'); // ink showing faintly through the back of the paper
@@ -241,6 +260,7 @@ function animateAngle(L, to, ms) {
 // Backward: snapshot the previous page and lay it back down over the current one.
 async function beginTurn(dir, makeNew) {
   let L;
+  toTop(); // every page opens at its top
   if (dir > 0) {
     L = makeLeaf(dir);
     if (makeNew) await createPage(); else S.idx++;
@@ -255,7 +275,10 @@ function endTurn(L, completed) {
   if (L.dir < 0 && completed) { S.idx--; renderPage(); }
   if (L.dir > 0 && !completed) { S.idx--; renderPage(); }
   L.leaf.remove(); L.cast.remove();
+  toTop();
 }
+let glideId = 0;
+function toTop() { glideId++; book.scrollTo({ top: 0, behavior: 'instant' }); } // also stops any glide or smooth scroll
 
 async function flip(dir, forceNew = false) {
   if (flipping || drag) return;
@@ -277,6 +300,18 @@ let drag = null;
 function dragMove(e) {
   if (!swipe || e.pointerId !== swipe.id) return;
   const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  // a mostly-vertical finger drag scrolls a long page instead of turning it
+  if (!drag && !swipe.pending && !swipe.mode && Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) {
+    swipe.mode = 'scroll'; swipe.st = book.scrollTop; swipe.ly = e.clientY; swipe.lt = performance.now(); swipe.v = 0;
+  }
+  if (swipe.mode === 'scroll') {
+    const now = performance.now();
+    if (now > swipe.lt) swipe.v = 0.7 * swipe.v + 0.3 * (swipe.ly - e.clientY) / (now - swipe.lt);
+    swipe.ly = e.clientY; swipe.lt = now;
+    book.scrollTop = swipe.st - dy;
+    swipe.over = swipe.st - dy - (book.scrollHeight - book.clientHeight); // how far past the bottom you've pulled
+    return;
+  }
   if (!drag) {
     if (flipping || swipe.pending || Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy)) return;
     const dir = dx < 0 ? 1 : -1;
@@ -292,7 +327,20 @@ function dragMove(e) {
 async function dragEnd(e, cancelled = false) {
   if (!swipe) return;
   const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y, dt = Date.now() - swipe.t;
+  const sw = swipe;
   swipe = null;
+  if (sw.mode === 'scroll') {
+    if (sw.over > 90 && growPage()) { // pulling well past the end adds another sheet
+      status('More paper added');
+      book.scrollTo({ top: book.scrollTop + SH * 0.6, behavior: 'smooth' });
+      return;
+    }
+    let v = sw.v * 16; // px per frame
+    const id = ++glideId;
+    const glide = () => { if (Math.abs(v) < 0.5 || swipe || id !== glideId) return; book.scrollTop += v; v *= 0.94; requestAnimationFrame(glide); };
+    requestAnimationFrame(glide);
+    return;
+  }
   if (drag) {
     const L = drag, progress = L.dir > 0 ? L.a / 180 : 1 - L.a / 180;
     const flick = Math.abs(dx) / dt > 0.45 && Math.sign(-dx) === L.dir;
@@ -338,7 +386,7 @@ function renderStickies() {
 function stickyEl(st) {
   const el = document.createElement('div');
   el.className = 'sticky';
-  el.style.left = st.x * 100 + '%'; el.style.top = st.y * 100 + '%';
+  el.style.left = st.x * 100 + '%'; el.style.top = `calc(var(--sheet-h) * ${st.y})`;
   el.style.setProperty('--sc', st.color); el.style.setProperty('--rot', st.rot + 'deg');
   el.innerHTML = `<div class="bar"><span>${st.type === 'voice' ? '🎙 voice memo' : '📝'}</span>
     <span><button class="c" title="Colour">🎨</button><button class="x" title="Remove">✕</button></span></div>`;
@@ -367,8 +415,8 @@ function stickyEl(st) {
     const r = $('#page').getBoundingClientRect(), sx = e.clientX, sy = e.clientY, ox = st.x, oy = st.y;
     const move = (ev) => {
       st.x = Math.min(0.9, Math.max(0, ox + (ev.clientX - sx) / r.width));
-      st.y = Math.min(0.92, Math.max(0, oy + (ev.clientY - sy) / r.height));
-      el.style.left = st.x * 100 + '%'; el.style.top = st.y * 100 + '%';
+      st.y = Math.min(pageLen() - 0.08, Math.max(0, oy + (ev.clientY - sy) / SH));
+      el.style.left = st.x * 100 + '%'; el.style.top = `calc(var(--sheet-h) * ${st.y})`;
     };
     const up = () => { bar.removeEventListener('pointermove', move); bar.removeEventListener('pointerup', up); touch(); };
     bar.addEventListener('pointermove', move); bar.addEventListener('pointerup', up);
@@ -378,7 +426,7 @@ function stickyEl(st) {
 function addSticky(extra) {
   const n = cur(); if (!n) return;
   const k = n.stickies.length;
-  const st = { id: uid(), type: 'text', text: '', x: 0.6 - (k % 3) * 0.05, y: 0.12 + (k % 5) * 0.08,
+  const st = { id: uid(), type: 'text', text: '', x: 0.6 - (k % 3) * 0.05, y: book.scrollTop / SH + 0.12 + (k % 5) * 0.08,
     rot: (Math.random() * 5 - 2.5).toFixed(1), color: STICKY_COLORS[k % STICKY_COLORS.length], ...extra };
   n.stickies.push(st); touch(); renderStickies();
 }
@@ -706,7 +754,7 @@ document.addEventListener('visibilitychange', () => {
   S.notes = sortNotes(await DB.all());
   if (!S.notes.length) { const n = newNote(); n.category = 'Personal'; S.notes.push(n); await DB.put(n); await DB.set('categories', S.categories); }
   S.view = S.notes; S.idx = S.notes.length - 1;
-  new ResizeObserver(resizeCanvas).observe(canvas);
+  new ResizeObserver(layoutPage).observe($('#book'));
   renderPage();
   await Sync.init();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js');

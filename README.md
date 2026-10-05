@@ -13,6 +13,7 @@ Both sync through one file in your Google Drive.
 |---|---|
 | Write | S-Pen (pressure-sensitive). On desktop, use the mouse. |
 | Erase | Hold the **S-Pen side button** while writing, or pick 🧽. The eraser removes whole strokes. |
+| Scroll a long page | Drag up or down with your finger. Writing near the bottom adds more paper, and so does pulling up past the end (up to 8 sheets per page). |
 | Flip pages | **Swipe with your finger**, or tap ‹ ›, or use the arrow keys. Fingers never draw, so a resting palm won't scribble. |
 | New page | ＋, or flip past the last page |
 | Title / keywords, date, category | The handwritten-style header on each page |

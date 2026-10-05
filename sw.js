@@ -1,6 +1,6 @@
 // Offline app shell. On every release bump VERSION here and the ?v= numbers in index.html (and SHELL below).
-const VERSION = 'pen-journal-v6';
-const SHELL = ['./', 'index.html', 'app.css?v=6', 'app.js?v=6', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
+const VERSION = 'pen-journal-v7';
+const SHELL = ['./', 'index.html', 'app.css?v=7', 'app.js?v=7', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -42,18 +42,18 @@ input, select { font: inherit; }
 
 /* desk + page */
 #desk { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 10px; min-height: 0; }
-#book { perspective: 2200px; height: 100%; display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0; }
+#book { perspective: 2200px; height: 100%; flex: 1; min-width: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 .page {
   position: relative;
-  aspect-ratio: 1 / 1.414;
-  height: 100%; max-width: 100%;
+  margin: 0 auto; /* width and height set from JS: one sheet wide, `len` sheets tall */
+  --sheet-h: 842px;
   background-color: var(--paper);
   /* margin line on top, then a blank header band ending in a heavier rule, then the ruled lines */
   background-image:
     linear-gradient(90deg, transparent 11.5%, var(--margin) 11.5%, var(--margin) calc(11.5% + 1.5px), transparent calc(11.5% + 1.5px)),
     linear-gradient(180deg, var(--paper) 0, var(--paper) calc(9.6% - 2px), var(--head-rule) calc(9.6% - 2px), var(--head-rule) 9.6%, transparent 9.6%),
     linear-gradient(180deg, transparent calc(100% - 1px), var(--rule) calc(100% - 1px));
-  background-size: 100% 100%, 100% 100%, 100% 3.2%;
+  background-size: 100% 100%, 100% var(--sheet-h), 100% calc(var(--sheet-h) * 0.032);
   background-repeat: no-repeat, no-repeat, repeat-y;
   border-radius: 3px 12px 12px 3px;
   box-shadow: inset 18px 0 22px -16px rgba(0,0,0,.35), 0 1px 0 var(--paper-edge), 0 3px 0 #efe6cf, 0 5px 0 #e2d7bb, 0 18px 40px rgba(0,0,0,.5);
@@ -61,13 +61,13 @@ input, select { font: inherit; }
   overflow: hidden;
   --head-rule: #8fb0d4;
 }
-@supports (height: 1cqh) { .page { container-type: size; } }
+@supports (width: 1cqw) { .page { container-type: inline-size; } }
 .pagehead {
-  position: absolute; left: 13%; right: 4%; top: 1.2%; height: 7.6%; padding-bottom: .4%;
+  position: absolute; left: 13%; right: 4%; top: calc(var(--sheet-h) * .012); height: calc(var(--sheet-h) * .076); padding-bottom: calc(var(--sheet-h) * .004);
   display: flex; align-items: flex-end; gap: 8px; z-index: 3;
 }
 .pagehead input, .pagehead select {
-  border: 0; background: transparent; color: var(--ink); font-family: Caveat, cursive; font-size: clamp(16px, 2.6cqh, 30px);
+  border: 0; background: transparent; color: var(--ink); font-family: Caveat, cursive; font-size: clamp(16px, 3.7cqw, 30px);
   border-bottom: 1px dashed transparent; padding: 0; min-width: 0; user-select: text; -webkit-user-select: text;
 }
 .pagehead input:focus { outline: none; border-bottom-color: var(--muted); }
@@ -81,14 +81,14 @@ input, select { font: inherit; }
 /* stickies */
 #stickies { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .sticky {
-  position: absolute; width: 30%; min-height: 14%; pointer-events: auto;
+  position: absolute; width: 30%; min-height: calc(var(--sheet-h) * .14); pointer-events: auto;
   background: var(--sc, #fff1a8); box-shadow: 2px 5px 10px rgba(0,0,0,.28);
   transform: rotate(var(--rot, -1.5deg)); display: flex; flex-direction: column;
   font-family: Caveat, cursive; border-radius: 2px 2px 14px 2px;
 }
 .sticky .bar { display: flex; justify-content: space-between; align-items: center; height: 26px; cursor: grab; touch-action: none; background: rgba(0,0,0,.06); padding: 0 4px; font-size: 13px; color: #5a4a2f; }
 .sticky .bar button { color: #5a4a2f; min-width: 24px; height: 24px; font-size: 14px; }
-.sticky textarea { flex: 1; border: 0; background: transparent; resize: none; font: inherit; font-size: clamp(15px, 2.4cqh, 24px); padding: 4px 8px; color: #2e2a1e; min-height: 70px; user-select: text; -webkit-user-select: text; }
+.sticky textarea { flex: 1; border: 0; background: transparent; resize: none; font: inherit; font-size: clamp(15px, 3.4cqw, 24px); padding: 4px 8px; color: #2e2a1e; min-height: 70px; user-select: text; -webkit-user-select: text; }
 .sticky textarea:focus { outline: none; }
 .sticky audio { width: calc(100% - 10px); margin: 6px 5px; height: 36px; }
 .sticky .meta { font-size: 13px; padding: 0 8px 6px; color: #6a5a3a; }
