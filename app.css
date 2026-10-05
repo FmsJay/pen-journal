@@ -154,3 +154,8 @@ body.compact #uiHandle { display: block; position: fixed; top: env(safe-area-ins
   border-radius: 0 0 12px 12px; background: rgba(40,28,20,.75); color: #f3e6cf; transition: top .25s ease; }
 body.compact.ui-open #uiHandle { top: var(--tb-h, 52px); }
 body.compact #desk { padding-top: 24px; }
+
+/* header: title on its own line across the top, date and category beneath it */
+.pagehead { flex-wrap: wrap; align-content: flex-end; row-gap: 0; }
+#noteTitle { order: -1; flex: 1 0 100%; }
+#noteCat { margin-left: auto; }
