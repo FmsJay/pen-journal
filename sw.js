@@ -1,5 +1,5 @@
 // Offline app shell. Bump VERSION whenever app files change so phones pick up the update.
-const VERSION = 'pen-journal-v1';
+const VERSION = 'pen-journal-v2';
 const SHELL = ['./', 'index.html', 'app.css', 'app.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => {

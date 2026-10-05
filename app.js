@@ -529,6 +529,7 @@ const Sync = {
   /* pull → merge → push; also leaves one dated snapshot per day in the Drive folder */
   async sync(interactive = false) {
     if (!this.clientId) { if (interactive) { $('#btnMenu').click(); status('Add your Google OAuth Client ID first', 4000); } return; }
+    if (location.protocol === 'file:') { if (interactive) status('Google sign-in only works from https://fmsjay.github.io/pen-journal/ — not a local file', 6000); return; }
     if (this.busy) return;
     if (!navigator.onLine) return this.paint('offline');
     this.busy = true; this.paint('syncing');
