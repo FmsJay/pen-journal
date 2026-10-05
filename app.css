@@ -48,19 +48,22 @@ input, select { font: inherit; }
   aspect-ratio: 1 / 1.414;
   height: 100%; max-width: 100%;
   background-color: var(--paper);
+  /* margin line on top, then a blank header band ending in a heavier rule, then the ruled lines */
   background-image:
     linear-gradient(90deg, transparent 11.5%, var(--margin) 11.5%, var(--margin) calc(11.5% + 1.5px), transparent calc(11.5% + 1.5px)),
-    repeating-linear-gradient(180deg, transparent 0, transparent calc(var(--line) - 1px), var(--rule) calc(var(--line) - 1px), var(--rule) var(--line));
-  background-position: 0 0, 0 var(--top);
+    linear-gradient(180deg, var(--paper) 0, var(--paper) calc(9.6% - 2px), var(--head-rule) calc(9.6% - 2px), var(--head-rule) 9.6%, transparent 9.6%),
+    linear-gradient(180deg, transparent calc(100% - 1px), var(--rule) calc(100% - 1px));
+  background-size: 100% 100%, 100% 100%, 100% 3.2%;
+  background-repeat: no-repeat, no-repeat, repeat-y;
   border-radius: 3px 12px 12px 3px;
   box-shadow: inset 18px 0 22px -16px rgba(0,0,0,.35), 0 1px 0 var(--paper-edge), 0 3px 0 #efe6cf, 0 5px 0 #e2d7bb, 0 18px 40px rgba(0,0,0,.5);
   transform-origin: left center;
   overflow: hidden;
-  --line: 3.2%; --top: 10%;
+  --head-rule: #8fb0d4;
 }
-@supports (height: 1cqh) { .page { container-type: size; --line: 3.2cqh; --top: 9.6cqh; } }
+@supports (height: 1cqh) { .page { container-type: size; } }
 .pagehead {
-  position: absolute; left: 13%; right: 4%; top: 2.5%; height: 6%;
+  position: absolute; left: 13%; right: 4%; top: 1.2%; height: 7.6%; padding-bottom: .4%;
   display: flex; align-items: flex-end; gap: 8px; z-index: 3;
 }
 .pagehead input, .pagehead select {
@@ -71,8 +74,6 @@ input, select { font: inherit; }
 #noteDate { width: 9.5em; color: var(--accent); }
 #noteTitle { flex: 1; font-weight: 700; }
 #noteCat { color: var(--muted); max-width: 30%; }
-.ribbon { position: absolute; right: 7%; top: -4px; width: 22px; height: 12%; z-index: 4;
-  clip-path: polygon(0 0,100% 0,100% 100%,50% 82%,0 100%); background: var(--cat, transparent); box-shadow: 0 2px 3px rgba(0,0,0,.3); }
 #ink { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; z-index: 2; }
 .pageno { position: absolute; bottom: 1.5%; width: 100%; text-align: center; font-family: Caveat, cursive; color: var(--muted); font-size: 18px; z-index: 1; }
 .flip { font-size: 40px; color: rgba(243,230,207,.6); height: 80px; min-width: 36px; }
@@ -142,3 +143,14 @@ input, select { font: inherit; }
 .leaf .back .shade { background: linear-gradient(270deg, rgba(0,0,0,.30), rgba(0,0,0,0) 30%, rgba(255,255,255,.12) 65%, rgba(0,0,0,.18)); }
 .page .cast { position: absolute; inset: 0; z-index: 9; pointer-events: none; opacity: 0;
   background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.12) 60%, rgba(0,0,0,0)) no-repeat left / 40% 100%; }
+
+/* Android: toolbar tucked away behind a small pull-down tab */
+#uiHandle { display: none; }
+body.compact .toolbar { position: fixed; top: 0; left: 0; right: 0; z-index: 15; padding-top: calc(6px + env(safe-area-inset-top));
+  background: rgba(40,28,20,.96); box-shadow: 0 4px 14px rgba(0,0,0,.4); transform: translateY(-100%); transition: transform .25s ease; }
+body.compact.ui-open .toolbar { transform: none; }
+body.compact #uiHandle { display: block; position: fixed; top: env(safe-area-inset-top); left: 50%; z-index: 16;
+  transform: translateX(-50%); width: 56px; min-width: 0; height: 22px; padding: 0; font-size: 14px; line-height: 22px;
+  border-radius: 0 0 12px 12px; background: rgba(40,28,20,.75); color: #f3e6cf; transition: top .25s ease; }
+body.compact.ui-open #uiHandle { top: var(--tb-h, 52px); }
+body.compact #desk { padding-top: 24px; }

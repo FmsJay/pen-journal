@@ -174,7 +174,7 @@ function renderPage() {
   $('#noteTitle').value = n ? n.title : '';
   fillCatSelect($('#noteCat'), false);
   $('#noteCat').value = n ? n.category : '';
-  $('#ribbon').style.setProperty('--cat', n ? catColor(n.category) : 'transparent');
+  $('#noteCat').style.color = n && n.category ? catColor(n.category) : '';
   $('#pageNo').textContent = S.view.length ? `${S.idx + 1} / ${S.view.length}` : '';
   renderStickies();
   redraw();
@@ -407,6 +407,16 @@ $('#btnVoice').onclick = async () => {
 };
 
 /* ---------------- toolbar ---------------- */
+// On Android the tools hide behind a pull-down tab; they tuck away again once you start writing.
+if (/Android/i.test(navigator.userAgent) || new URLSearchParams(location.search).has('compact')) document.body.classList.add('compact');
+function setUi(open) {
+  document.body.classList.toggle('ui-open', open);
+  $('#uiHandle').textContent = open ? '⌃' : '⌄';
+  document.body.style.setProperty('--tb-h', document.querySelector('.toolbar').offsetHeight + 'px');
+}
+$('#uiHandle').onclick = () => setUi(!document.body.classList.contains('ui-open'));
+canvas.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'touch') setUi(false); });
+
 document.querySelectorAll('[data-tool]').forEach((b) => b.onclick = () => {
   S.tool = b.dataset.tool;
   document.querySelectorAll('[data-tool]').forEach((x) => x.classList.toggle('on', x === b));
