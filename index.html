@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#3b2a1e">
+<title>Pen Journal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Lora:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="toolbar">
+  <div class="group">
+    <button id="btnSearch" title="Search &amp; filter">🔍</button>
+    <span id="filterBadge" class="badge" hidden>filtered ✕</span>
+  </div>
+  <div class="group tools">
+    <button data-tool="pen" class="on" title="Pen">✒️</button>
+    <button data-tool="highlighter" title="Highlighter">🖍️</button>
+    <button data-tool="eraser" title="Eraser (or hold the S-Pen button)">🧽</button>
+    <span class="colors">
+      <button class="swatch on" data-color="#1d2b53" style="--c:#1d2b53"></button>
+      <button class="swatch" data-color="#111111" style="--c:#111"></button>
+      <button class="swatch" data-color="#b3261e" style="--c:#b3261e"></button>
+      <button class="swatch" data-color="#1e6b3a" style="--c:#1e6b3a"></button>
+      <button class="swatch" data-color="#e0a800" style="--c:#e0a800"></button>
+    </span>
+    <input id="width" type="range" min="1" max="8" value="3" title="Pen size">
+    <button id="btnUndo" title="Undo">↶</button>
+  </div>
+  <div class="group">
+    <button id="btnSticky" title="Add typed sticky note">📝</button>
+    <button id="btnVoice" title="Record voice memo">🎙️</button>
+    <button id="btnNew" title="New page">＋</button>
+    <button id="btnSync" title="Google Drive sync">☁️</button>
+    <button id="btnMenu" title="More">⋮</button>
+  </div>
+</header>
+
+<main id="desk">
+  <button class="flip prev" id="btnPrev" aria-label="Previous page">‹</button>
+  <div id="book">
+    <article id="page" class="page">
+      <div class="ribbon" id="ribbon"></div>
+      <div class="pagehead">
+        <input id="noteDate" type="date">
+        <input id="noteTitle" placeholder="Title / keywords…" autocomplete="off">
+        <select id="noteCat"></select>
+      </div>
+      <canvas id="ink"></canvas>
+      <div id="stickies"></div>
+      <div class="pageno" id="pageNo"></div>
+    </article>
+  </div>
+  <button class="flip next" id="btnNext" aria-label="Next page">›</button>
+</main>
+
+<div id="status"></div>
+
+<!-- Search / filter drawer -->
+<aside id="drawer" class="drawer" hidden>
+  <div class="drawer-head"><h2>Find in journal</h2><button id="btnCloseDrawer">✕</button></div>
+  <label>Keyword <input id="fText" type="search" placeholder="title, sticky text, category…"></label>
+  <label>Category <select id="fCat"></select></label>
+  <div class="row">
+    <label>From <input id="fFrom" type="date"></label>
+    <label>To <input id="fTo" type="date"></label>
+  </div>
+  <label>Sort
+    <select id="fSort">
+      <option value="date">By date</option>
+      <option value="category">By category, then date</option>
+    </select>
+  </label>
+  <div class="row">
+    <button id="btnApply" class="primary">Flip through results</button>
+    <button id="btnClear">Clear</button>
+  </div>
+  <ol id="results"></ol>
+</aside>
+
+<!-- Menu -->
+<aside id="menu" class="drawer" hidden>
+  <div class="drawer-head"><h2>Journal</h2><button id="btnCloseMenu">✕</button></div>
+  <h3>Categories</h3>
+  <ul id="catList"></ul>
+  <div class="row"><input id="newCat" placeholder="New category"><input id="newCatColor" type="color" value="#7a4e2d"><button id="btnAddCat">Add</button></div>
+  <h3>Google Drive</h3>
+  <label>OAuth Client ID <input id="clientId" placeholder="xxxx.apps.googleusercontent.com"></label>
+  <div class="row"><button id="btnSaveClient" class="primary">Save &amp; sign in</button><button id="btnSignOut">Sign out</button></div>
+  <p class="hint" id="syncInfo"></p>
+  <h3>Local backup</h3>
+  <div class="row"><button id="btnExport">Export .json</button><label class="filebtn">Import .json<input id="importFile" type="file" accept="application/json" hidden></label></div>
+  <h3>This page</h3>
+  <button id="btnDelete" class="danger">Delete this page</button>
+</aside>
+
+<script src="app.js"></script>
+</body>
+</html>
