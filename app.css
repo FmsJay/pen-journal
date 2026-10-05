@@ -128,3 +128,17 @@ input, select { font: inherit; }
   #width { width: 56px; }
   .toolbar button { min-width: 34px; font-size: 18px; }
 }
+
+/* page turn */
+#book { position: relative; }
+.leaf { position: absolute; z-index: 10; transform-origin: left center; transform-style: preserve-3d; pointer-events: none; will-change: transform; }
+.leaf .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; border-radius: 3px 12px 12px 3px; }
+.leaf .front .page { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; transform: none;
+  box-shadow: inset 18px 0 22px -16px rgba(0,0,0,.35); }
+.leaf .back { transform: rotateY(180deg); background: #f3ecda; box-shadow: inset -18px 0 22px -16px rgba(0,0,0,.35); }
+.leaf .ghost { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); opacity: .09; }
+.leaf .shade { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+.leaf .front .shade { background: linear-gradient(90deg, rgba(0,0,0,.28), rgba(0,0,0,0) 25%, rgba(255,255,255,.18) 62%, rgba(0,0,0,.32)); opacity: 0; }
+.leaf .back .shade { background: linear-gradient(270deg, rgba(0,0,0,.30), rgba(0,0,0,0) 30%, rgba(255,255,255,.12) 65%, rgba(0,0,0,.18)); }
+.page .cast { position: absolute; inset: 0; z-index: 9; pointer-events: none; opacity: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.12) 60%, rgba(0,0,0,0)) no-repeat left / 40% 100%; }

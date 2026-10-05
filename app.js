@@ -130,7 +130,11 @@ function eraseAt(pt) {
 canvas.addEventListener('pointerdown', (e) => {
   if (!cur()) return;
   if (e.pointerType === 'pen') sawPen = true;
-  if (e.pointerType === 'touch') { swipe = { x: e.clientX, y: e.clientY, t: Date.now() }; return; }
+  if (e.pointerType === 'touch') {
+    swipe = { x: e.clientX, y: e.clientY, t: Date.now(), id: e.pointerId };
+    try { canvas.setPointerCapture(e.pointerId); } catch {}
+    return;
+  }
   try { canvas.setPointerCapture(e.pointerId); } catch {}
   // S-Pen side button reports as buttons & 2; some styluses report eraser end as buttons & 32
   erasing = S.tool === 'eraser' || (e.buttons & 2) || (e.buttons & 32);
@@ -139,7 +143,7 @@ canvas.addEventListener('pointerdown', (e) => {
   drawSegment(live, live.pts[0], live.pts[0]);
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (e.pointerType === 'touch') return;
+  if (e.pointerType === 'touch') return dragMove(e);
   let evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
   if (!evs.length) evs = [e];
   if (erasing && e.buttons) { evs.forEach((ev) => eraseAt(norm(ev))); return; }
@@ -157,14 +161,10 @@ const endStroke = () => {
   erasing = false;
 };
 canvas.addEventListener('pointerup', (e) => {
-  if (e.pointerType === 'touch' && swipe) {
-    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - swipe.t < 800) flip(dx < 0 ? 1 : -1);
-    swipe = null; return;
-  }
+  if (e.pointerType === 'touch') return dragEnd(e);
   endStroke();
 });
-canvas.addEventListener('pointercancel', endStroke);
+canvas.addEventListener('pointercancel', (e) => { if (e.pointerType === 'touch') dragEnd(e, true); else endStroke(); });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 /* ---------------- page rendering & flipping ---------------- */
@@ -180,39 +180,140 @@ function renderPage() {
   redraw();
 }
 
+/* Page turning: a snapshot of the page (the "leaf") rotates around the spine on the left,
+   over the real page underneath. Angle 0 = lying flat on the page, 180 = turned over. */
 let flipping = false;
-async function flip(dir) {
-  const next = S.idx + dir;
-  if (flipping) return;
-  if (next < 0) return status('First page');
-  if (next >= S.view.length) {
-    if (S.filter) return status('End of results');
-    return addPage();
+const book = $('#book');
+
+function snapshotPage() {
+  const page = $('#page'), clone = page.cloneNode(true);
+  const c = clone.querySelector('canvas');
+  c.width = canvas.width; c.height = canvas.height; c.getContext('2d').drawImage(canvas, 0, 0);
+  const src = page.querySelectorAll('input,select,textarea'), dst = clone.querySelectorAll('input,select,textarea');
+  src.forEach((el, i) => { dst[i].value = el.value; });
+  // the clone keeps its ids so the CSS still applies; it sits after #page, so $('#…') still finds the real elements
+  return clone;
+}
+function makeLeaf(dir) {
+  const page = $('#page'), r = page.getBoundingClientRect(), b = book.getBoundingClientRect();
+  const leaf = document.createElement('div');
+  leaf.className = 'leaf';
+  Object.assign(leaf.style, { left: r.left - b.left + 'px', top: r.top - b.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+  leaf.innerHTML = '<div class="face front"><div class="shade"></div></div><div class="face back"><div class="shade"></div></div>';
+  leaf.firstChild.prepend(snapshotPage());
+  const ghost = document.createElement('canvas'); // ink showing faintly through the back of the paper
+  ghost.className = 'ghost'; ghost.width = canvas.width; ghost.height = canvas.height;
+  ghost.getContext('2d').drawImage(canvas, 0, 0);
+  leaf.lastChild.prepend(ghost);
+  book.appendChild(leaf);
+  const cast = document.createElement('div');
+  cast.className = 'cast'; page.appendChild(cast);
+  return { dir, leaf, cast, front: leaf.querySelector('.front .shade'), back: leaf.querySelector('.back .shade'), a: 0 };
+}
+function setAngle(L, a) {
+  L.a = a;
+  const t = a / 180, lift = Math.sin(t * Math.PI);
+  // the slight skew and scale read as the paper bending as it lifts off the page
+  L.leaf.style.transform = `rotateY(${-a}deg) skewY(${(-lift * 2.2).toFixed(2)}deg) scaleY(${1 + lift * 0.015})`;
+  L.leaf.style.opacity = a > 150 ? Math.max(0, (180 - a) / 30) : 1;
+  L.front.style.opacity = Math.min(1, t * 1.8);
+  L.back.style.opacity = Math.min(1, (1 - t) * 1.8);
+  L.cast.style.opacity = (lift * 0.8).toFixed(3);
+  L.cast.style.backgroundSize = `${Math.max(8, (1 - Math.abs(t - 0.5) * 2) * 70 + Math.cos(t * Math.PI) * 30)}% 100%`;
+}
+function animateAngle(L, to, ms) {
+  const from = L.a;
+  return new Promise((res) => {
+    const t0 = performance.now();
+    let done = false;
+    const step = (now) => {
+      if (done) return;
+      if (document.hidden) { done = true; setAngle(L, to); return res(); } // hidden tabs don't animate
+      const k = Math.min(1, (now - t0) / ms), e = k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
+      setAngle(L, from + (to - from) * e);
+      if (k < 1) requestAnimationFrame(step); else { done = true; res(); }
+    };
+    requestAnimationFrame(step);
+    setTimeout(() => step(t0 + ms), ms + 300); // rAF is paused while the app is in the background
+  });
+}
+// Forward: snapshot the current page, then reveal the next one beneath it.
+// Backward: snapshot the previous page and lay it back down over the current one.
+async function beginTurn(dir, makeNew) {
+  let L;
+  if (dir > 0) {
+    L = makeLeaf(dir);
+    if (makeNew) await createPage(); else S.idx++;
+    renderPage(); setAngle(L, 0);
+  } else {
+    S.idx--; renderPage(); L = makeLeaf(dir); setAngle(L, 180);
+    S.idx++; renderPage();
   }
-  flipping = true;
-  const page = $('#page');
-  // Turning forward: page swings left around the spine. Backward: previous page swings back in.
-  const out = dir > 0
-    ? [{ transform: 'rotateY(0)' }, { transform: 'rotateY(-95deg)', filter: 'brightness(.7)' }]
-    : [{ transform: 'rotateY(0)' }, { transform: 'rotateY(30deg) translateX(4%)', opacity: 0.2 }];
-  await page.animate(out, { duration: 260, easing: 'ease-in' }).finished;
-  S.idx = next; renderPage();
-  const inn = dir > 0
-    ? [{ transform: 'rotateY(18deg)', opacity: 0.4 }, { transform: 'rotateY(0)', opacity: 1 }]
-    : [{ transform: 'rotateY(-95deg)', filter: 'brightness(.7)' }, { transform: 'rotateY(0)' }];
-  await page.animate(inn, { duration: 280, easing: 'ease-out' }).finished;
-  flipping = false;
+  return L;
+}
+function endTurn(L, completed) {
+  if (L.dir < 0 && completed) { S.idx--; renderPage(); }
+  if (L.dir > 0 && !completed) { S.idx--; renderPage(); }
+  L.leaf.remove(); L.cast.remove();
 }
 
-async function addPage() {
+async function flip(dir, forceNew = false) {
+  if (flipping || drag) return;
+  const next = S.idx + dir;
+  if (next < 0) return status('First page');
+  const makeNew = forceNew || next >= S.view.length;
+  if (makeNew && S.filter && !forceNew) return status('End of results');
+  flipping = true;
+  try {
+    const L = await beginTurn(dir, makeNew);
+    await animateAngle(L, dir > 0 ? 180 : 0, 700);
+    endTurn(L, true);
+    if (makeNew) status('New page');
+  } finally { flipping = false; }
+}
+
+/* A finger dragged sideways on the page holds the leaf, so you can lift it slowly and peek. */
+let drag = null;
+function dragMove(e) {
+  if (!swipe || e.pointerId !== swipe.id) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  if (!drag) {
+    if (flipping || swipe.pending || Math.abs(dx) < 14 || Math.abs(dx) < Math.abs(dy)) return;
+    const dir = dx < 0 ? 1 : -1;
+    if ((dir > 0 && S.idx + 1 >= S.view.length) || (dir < 0 && S.idx === 0)) return; // ends: a quick swipe handles these
+    swipe.pending = true;
+    beginTurn(dir, false).then((L) => { drag = L; swipe && (swipe.pending = false); });
+    return;
+  }
+  const w = $('#page').getBoundingClientRect().width * 0.9;
+  const k = Math.min(1, Math.max(0, (drag.dir > 0 ? -dx : dx) / w));
+  setAngle(drag, drag.dir > 0 ? k * 180 : 180 - k * 180);
+}
+async function dragEnd(e, cancelled = false) {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y, dt = Date.now() - swipe.t;
+  swipe = null;
+  if (drag) {
+    const L = drag, progress = L.dir > 0 ? L.a / 180 : 1 - L.a / 180;
+    const flick = Math.abs(dx) / dt > 0.45 && Math.sign(-dx) === L.dir;
+    const done = !cancelled && (progress > 0.4 || flick);
+    const target = done === (L.dir > 0) ? 180 : 0;
+    flipping = true;
+    await animateAngle(L, target, 150 + 450 * Math.abs(target - L.a) / 180);
+    endTurn(L, done); drag = null; flipping = false;
+    return;
+  }
+  if (!cancelled && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 800) flip(dx < 0 ? 1 : -1);
+}
+
+async function createPage() {
   clearFilter(false);
   const n = newNote();
   if (S.notes.length) n.category = S.notes[S.notes.length - 1].category;
   S.notes.push(n); sortNotes(S.notes);
   await DB.put(n);
   S.view = S.notes; S.idx = S.view.indexOf(n);
-  renderPage(); Sync.schedule();
-  status('New page');
+  Sync.schedule();
 }
 
 /* ---------------- page header fields ---------------- */
@@ -317,7 +418,7 @@ document.querySelectorAll('.swatch').forEach((b) => b.onclick = () => {
 });
 $('#width').oninput = (e) => S.width = +e.target.value;
 $('#btnUndo').onclick = () => { const n = cur(); if (n && n.strokes.pop()) { redraw(); touch(); } };
-$('#btnNew').onclick = addPage;
+$('#btnNew').onclick = () => flip(1, true);
 $('#btnPrev').onclick = () => flip(-1);
 $('#btnNext').onclick = () => flip(1);
 document.addEventListener('keydown', (e) => {
