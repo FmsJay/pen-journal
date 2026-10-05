@@ -73,4 +73,4 @@ Then open http://localhost:8766. To test Drive sync locally, also add `http://lo
 
 ## Updating
 
-After changing files, bump `VERSION` in `sw.js` so installed copies pick up the new version.
+After changing files, bump `VERSION` in `sw.js` and the `?v=` numbers in `index.html` and `sw.js`, so phones never mix old and new files.
